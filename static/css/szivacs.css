@@ -1,0 +1,22 @@
+.statuslight-text {
+	text-align: center;
+	margin: 5px;
+	padding: 5px;
+	border-top: 2px solid blue;
+}
+
+.statuslight-output {
+	text-align: center;
+	margin: 5px;
+	padding: 5px;
+	font-weight: bold;
+	border-bottom: 1px solid black;
+}
+
+.statuslight-state {
+	text-align: center;
+	font-weight: bold;
+	margin: 5px;
+	padding: 5px;
+	border-bottom: 1px solid black;
+}
