@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Szivacs szivattyúvezérlés
-# Bemenetek:
-# 1 - LOW - Szivattyú müködés
-# 2 - LOW - Vésszint jelző
-# 3 - LOW - Szint jelző
+# Szivacs sump pump control
+# inputs:
+# 1 - LOW - Pump running
+# 2 - LOW - Overflow alert
+# 3 - LOW - Level alert
 
-import automationhat
 from flask import Flask, render_template, make_response
+
 app = Flask(__name__)
 
 @app.route("/")
