@@ -29,14 +29,12 @@ class PumpState():
 		self.level = False
 		self.relay = False
 		self.last_change = time_module.time()
-		self.state = "idle"
+		self.state = ""
 		self.past_states = deque([], 10)
-		self.cause = "Startup"
-		self.prevstate = (self.pump, self.emergency, self.level, self.state, self.cause)
-		print "{} Started input polling.".format(time_module.strftime("%Y.%m.%d %H:%M"))
+		self.cause = ""
+		self.state_change("idle", "Startup")
 
 	def update(self):
-		self.prevstate = (self.pump, self.emergency, self.level, self.state)
 		self.pump = not(ah.input.one.read())
 		self.emergency = not(ah.input.two.read())
 		self.level = not(ah.input.three.read())
@@ -56,7 +54,7 @@ class PumpState():
 		elif (self.pump, self.emergency, self.level, self.relay) == (False, False, True, True) and (self.last_change + 5) > time_module.time(): #4 in-time
 			self.state_change("pump start", "Relay just closed, pump should start in 5 sec #4")
 			return
-		elif (self.pump, self.emergency, self.level, self.relay) == (False, False, True, True) and (self.last_change + 5) > time_module.time(): #4 timeout
+		elif (self.pump, self.emergency, self.level, self.relay) == (False, False, True, True) and (self.last_change + 5) < time_module.time(): #4 timeout
 			self.state_change("error", "Relay just closed, pump did not start in 5 sec #4")
 			return
 		elif (self.pump, self.emergency, self.level, self.relay) == (True, True, False, True): #5
@@ -65,11 +63,11 @@ class PumpState():
 		elif (self.pump, self.emergency, self.level, self.relay) == (False, True, False, True): #6
 			self.state_change("error", "Pump not running despite both emergency and relay True #6")
 			return
-		elif (self.pump, self.emergency, self.level, self.relay) == (True, False, False, True) and (self.last_change + 120) > time_module.time(): #7 in-time
+		elif (self.pump, self.emergency, self.level, self.relay) == (True, False, False, True) and (self.last_change + 20) > time_module.time(): #7 in-time
 			self.state_change("pump running", "Pump running, switchoff after 120 sec #7")
 			return
-		elif (self.pump, self.emergency, self.level, self.relay) == (True, False, False, True) and (self.last_change + 120) < time_module.time(): #7 in-time
-			ah.relay.one.write(False)
+		elif (self.pump, self.emergency, self.level, self.relay) == (True, False, False, True) and (self.last_change + 20) < time_module.time(): #7 in-time
+			self.state_change("pump stopping", "Pump has exceeded switchoff time limit. #7")
 			return
 		elif (self.pump, self.emergency, self.level, self.relay) == (False, False, False, True): #8
 			self.state_change("error", "Only relay True #8")
@@ -106,24 +104,29 @@ class PumpState():
 			return
 
 	def state_change(self, state, cause):
-		if self.state != state or self.cause != cause:
-			print "{} {} -> {} - {}".format(time_module.strftime("%Y.%m.%d %H:%M"), self.state, state, cause)
-			if state == "error":
+		if (self.state != "error") or (self.state == "error" and state == "idle") or ((self.state == "error" and state == "error") and self.cause != cause):
+			if state in ["error", "pump stopping"]:
 				self.relay = False
-				ah.relay.one.off()
-			mail_message_body = "\n".join(["{} {} - {}".format(time_module.strftime("%Y.%m.%d %H:%M", time), state, cause) for time, state, cause in self.past_states])
-			print mail_message_body
-			self.past_states.append((time_module.time(), state, cause))
-			self.state = state
-			self.cause = cause
-			self.last_change = time_module.time()
+			elif state in ["level trigger"]:
+				self.relay = True
+			ah.relay.one.write(self.relay)
+			if self.state != state or self.cause != cause:
+				print "{} {} -> {} - {}".format(time_module.strftime("%Y.%m.%d %H:%M"), self.state, state, cause)
+				self.state = state
+				self.cause = cause
+				self.last_change = time_module.time()
+				self.past_states.append((time_module.localtime(), state, cause))
+
+				# mail_message_body = "\n".join(["\t{} {} - {}".format(time_module.strftime("%Y.%m.%d %H:%M", m_time), m_state, m_cause) for m_time, m_state, m_cause in self.past_states])
+				# print mail_message_body
 
 pump = PumpState()
 
-while 1:
-	try:
-		time_module.sleep(0.25)
+try:
+	while 1:
+		time_module.sleep(1)
 		pump.update()
-	except KeyboardInterrupt:
-		ah.relay.one.off()
-		exit()
+except KeyboardInterrupt:
+	ah.relay.one.off()
+	print ""
+	exit()
